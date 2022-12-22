@@ -3,7 +3,9 @@ package com.absheikh.models
 
 import com.absheikh.core.db
 import com.absheikh.utils.BaseResponse
+import com.absheikh.utils.JWTConfig
 import io.ktor.http.*
+import io.ktor.server.auth.*
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import java.time.LocalDateTime
@@ -41,18 +43,20 @@ interface User : Entity<User> {
                 set(it.name, params.name)
                 set(it.email, params.email)
                 set(it.password, hashedPassword)
-                set(it.role, params.role)
 
             }
             return if (num > 0){
                 var user = db.users.find { Users.email eq params.email }
+
+                //generate token
+                val token = user?.let { JWTConfig.getInstance("secret").generateToken(it.id) }
 
                 var userData = user?.let {
                     UserResponse (
                         id = it.id,
                         name = user.name,
                         email = user.email,
-                        role = user.role,
+                        token = token,
                         createdAt = user.createdAt.toString(),
                         updatedAt = user.updatedAt.toString()
                     )
@@ -73,12 +77,15 @@ interface User : Entity<User> {
             val user = db.users.find { it.email eq params.email }
             if(user != null){
                 if(BCrypt.checkpw(params.password, user.password)){
+
+                    //generate token
+                    val token = JWTConfig.getInstance("secret").generateToken(user.id)
                     var userData = user.let {
                         UserResponse (
                             id = it.id,
                             name = user.name,
                             email = user.email,
-                            role = user.role,
+                            token = token,
                             createdAt = user.createdAt.toString(),
                             updatedAt = user.updatedAt.toString()
                         )
@@ -89,9 +96,28 @@ interface User : Entity<User> {
             return BaseResponse.Error(message = "Invalid credentials")
         }
 
-        fun emailExists(email: String): Boolean {
+        private fun emailExists(email: String): Boolean {
             val user = db.users.find { it.email.eq(email)}
             return user != null
+        }
+
+        fun getProfile(id: Long): BaseResponse<Any> {
+            val user = db.users.find { it.id eq id}
+
+
+            if(user != null){
+                var userData = user.let {
+                    UserResponse (
+                        id = it.id,
+                        name = user.name,
+                        email = user.email,
+                        createdAt = user.createdAt.toString(),
+                        updatedAt = user.updatedAt.toString()
+                    )
+                }
+                return BaseResponse.Success(data = user, message = "Profile fetched successfully")
+            }
+            return BaseResponse.Error(message = "User not found")
         }
 
 
@@ -100,7 +126,6 @@ interface User : Entity<User> {
     var name: String
     var email: String
     var password: String
-    var role: Int
     var createdAt: LocalDateTime
     var updatedAt: LocalDateTime
 
@@ -112,7 +137,6 @@ object Users : Table<User>("users") {
     val name = varchar("name").bindTo { it.name }
     val email = varchar("email").bindTo { it.email }
     val password = varchar("password").bindTo { it.password }
-    val role = int("role").bindTo { it.role }
     val createdAt = datetime("created_at").bindTo { it.createdAt }
     val updatedAt = datetime("updated_at").bindTo { it.updatedAt }
 }
@@ -124,17 +148,16 @@ data class UserResponse(
     val id: Long,
     val name: String,
     val email: String,
-    val role: Int,
     val token: String? = null,
     val createdAt: String,
     val updatedAt: String
 
 )
 
+
 data class RegisterParams(
     val name: String,
     val email: String,
-    val role: Int? = 2,
     val password: String
 )
 
