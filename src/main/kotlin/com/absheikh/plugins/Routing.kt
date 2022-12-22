@@ -1,6 +1,6 @@
 package com.absheikh.plugins
 
-import com.absheikh.routes.userRouting
+import com.absheikh.routes.*
 import io.ktor.server.routing.*
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -10,6 +10,6 @@ import io.ktor.server.request.*
 fun Application.configureRouting() {
 
     routing {
-        userRouting()
+        authRouting()
     }
 }
